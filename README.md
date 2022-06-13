@@ -1,3 +1,137 @@
+# Notas de Manu
+
+* Sobre el punto de dejar comentarios sobre el propio código, he preferido no ponerlo en práctica durante el ejercicio. Mi punto de vista es que la declaración tanto de métodos como de variables debe ser lo suficientemente claro para que en sí mismo sirva de documentación.
+
+## Bonus
+
+* Paso a explicar cómo implementaría que un usuario obtenga un ticket de forma semanal.
+    * Se puede hacer de varias formas, pero la más sencilla sería tener una clave en la entidad "`users`" tipo "`lastIssuedTicket`" con la fecha de la última vez que recibió el ticket semanal. Con una simple función, se podría obtener la diferencia de días entre la fecha almacenada y la actual durante el proceso de login, otorgando un ticket semanal. Si se quisiera hacer por semana "pura", podríamos obtener si los días a comparar pertenecen a la misma semana del mismo mes y año, si ha pasado la semana, se sumaría el ticket. Por ejemplo, la librería `date-fns` tiene un método llamado `isSameWeek` para este propósito. Obviamente, el campo "lastIssuedTicket" se debe actualizar una vez otorgado el ticket al usuario.
+
+## Implementación cloud-native
+
+* Finalmente opté por utilizar `AWS Lambda` junto a `Serverless` para realizar el ejercicio. Como base de datos he utilizado `DynamoDB`.
+* En cuanto a logging y monitorización he estado utilizando `CloudWatch` junto a un utils en código para tener un formato de los mensajes de error, así podía localizar de forma rápida qué fichero y método lanzaban la excepción. Aunque serverless te permite monitorizar la aplicación, para este ejercicio veía suficiente `CloudWatch`.
+* En cuanto a gestión de errores, no he llegado a profundizar en ello.
+
+## Testing
+
+* Para realizar los tests unitarios del ejercicio, he utilizado `jest`.
+* No he realizado tests de integración.
+* No he añadido toda la cobertura de tests. Quise cubrir al menos una parte de los controladores para mostrar cómo suelo proceder a realizarlos.
+
+## DEMO
+
+* La función lambda está publicada en el siguiente enlace: https://7qfmzdyw27.execute-api.eu-west-3.amazonaws.com/
+
+A continuación, paso a explicar los endpoint desarrollados y cómo interactuar con ellos.
+
+### **[GET] /users/{emailLogin} - Obtener Usuario**
+```
+Se obtiene el usuario con el email / login indicado. Si no existe, se devuelve un error.
+
+Ejemplo: https://7qfmzdyw27.execute-api.eu-west-3.amazonaws.com/users/manurgdev
+```
+
+### **[POST] /users - Crear usuario**
+```
+Se crea un usuario con los datos indicados. Si ya existe, se devuelve un error. Si faltan campos necesarios, se devuelve error.
+
+Ejemplo: https://7qfmzdyw27.execute-api.eu-west-3.amazonaws.com/users
+
+body:
+ {
+    "email": "pepe@pepe.com",
+    "password": "123456",
+    "name": "Pepe Pérez",
+    "login": "pepe"
+ }
+```
+
+### **[GET] /contests - Obtener lista de concursos**
+```
+Se obtiene la lista de todos los concursos. Si no existen concursos, se devuelve un error.
+
+Ejemplo: https://7qfmzdyw27.execute-api.eu-west-3.amazonaws.com/contests
+```
+
+### **[GET] /contests/{id} - Obtener concurso por id**
+```
+Se obtiene el concurso con el id indicado. Si no existe, se devuelve un error.
+
+Ejemplo: https://7qfmzdyw27.execute-api.eu-west-3.amazonaws.com/contests/3f87f50e-1616-4765-98c5-76014c8e494c
+```
+
+### **[GET] /contests/{id}/participants - Obtener listado de participantes de un concurso**
+```
+Se obtiene el listado de participantes de un concurso. Si no existen participantes, se devuelve un error.
+
+Ejemplo: https://7qfmzdyw27.execute-api.eu-west-3.amazonaws.com/contests/3f87f50e-1616-4765-98c5-76014c8e494c/participants
+```
+
+### **[POST] /contests - Crear concurso**
+```
+Se crea un concurso con los datos indicados. Si ya existe, se devuelve un error. Si faltan campos necesarios, se devuelve error.
+
+Ejemplo: https://7qfmzdyw27.execute-api.eu-west-3.amazonaws.com/contests
+
+body:
+{
+    "name": "Concurso de prueba",
+    "description": "Concurso de prueba para probar el funcionamiento de la API"
+}
+```
+
+### **[GET] /tickets - Obtener listado de tickets**
+```
+Se obtiene el listado de todos los tickets. Si no existen tickets, se devuelve un error. Este endpoint existe por debug, ya que no sería necesaria su implementación en un entorno real.
+
+Ejemplo: https://7qfmzdyw27.execute-api.eu-west-3.amazonaws.com/tickets
+```
+
+### **[GET] /tickets/user/{userInfo} - Obtener listado de tickets de un usuario**
+```
+Se obtiene el listado de todos los tickets de un usuario. Si no existen tickets, se devuelve un error. También permite filtrar por estado (canjeado o disponible). También permite filtrar por concurso.
+
+Ejemplo: https://7qfmzdyw27.execute-api.eu-west-3.amazonaws.com/tickets/user/manurgdev
+
+Ejemplo buscando usuario por email: https://7qfmzdyw27.execute-api.eu-west-3.amazonaws.com/tickets/user/manurgdev@gmail.com
+
+Ejemplo con filtro ticket disponible: https://7qfmzdyw27.execute-api.eu-west-3.amazonaws.com/tickets/user/manurgdev?available=1
+
+Ejemplo con filtro ticket canjeado: https://7qfmzdyw27.execute-api.eu-west-3.amazonaws.com/tickets/user/manurgdev?available=0
+
+Ejemplo con filtro por id de concurso: https://7qfmzdyw27.execute-api.eu-west-3.amazonaws.com/tickets/user/manurgdev?contest=3f87f50e-1616-4765-98c5-76014c8e494c
+```
+
+### **[POST] /tickets/redeem - Canjear ticket ya existente para un usuario y concurso**
+```
+Se canjea un ticket existente. Si no existe, se devuelve un error. Si el usuario no tiene más tickets disponibles, se devuelve un error.
+
+Ejemplo: https://7qfmzdyw27.execute-api.eu-west-3.amazonaws.com/tickets/redeem
+
+body:
+{
+    "userInfo": "manurgdev", // También puede ser el email
+    "contestId": "3f87f50e-1616-4765-98c5-76014c8e494c"
+}
+```
+
+### **[POST] /tickets - Crear ticket**
+```
+Se crea un ticket nuevo al usuario. Si no existe el usuario, se devuelve error. El ticket no estará asociado a un concurso y su estado será dispnible. Este endpoint está disponible para pruebas, ya que en el entorno real sería un proceso interno de la aplicación. Por ejemplo, se lanzaría cuando el usuario acceda a la aplicación una vez por semana.
+
+Ejemplo: https://7qfmzdyw27.execute-api.eu-west-3.amazonaws.com/tickets
+
+body:
+{
+    "userLogin": "manurgdev" //En este caso se filtra por login del usuario directamente.
+}
+```
+
+## Cómo trabajar con la aplicación
+
+He preparado el documento `INSTALL.md` con las pocas configuraciones necesarias para poder lanzar la aplicación a AWS sin mayor problema.
+
 # Prueba técnica backend
 
 ## Introducción

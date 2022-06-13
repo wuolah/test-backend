@@ -1,0 +1,48 @@
+service: wuolah-test-backend
+frameworkVersion: '3'
+
+custom:
+  users:
+    tableName: users
+  contests:
+    tableName: contests
+  tickets:
+    tableName: tickets
+
+provider:
+  name: aws
+  runtime: nodejs14.x
+  region: eu-west-3
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:*
+          Resource:
+            - Fn::GetAtt: [UsersTable, Arn]
+            - Fn::Join:
+              - "/"
+              -
+                - Fn::GetAtt: [UsersTable, Arn]
+                - "index/*"
+            - Fn::GetAtt: [ContestsTable, Arn]
+            - Fn::GetAtt: [TicketsTable, Arn]
+            - Fn::Join:
+              - "/"
+              -
+                - Fn::GetAtt: [TicketsTable, Arn]
+                - "index/*"
+  environment:
+    USERS_TABLE: ${self:custom.users.tableName}
+    CONTESTS_TABLE: ${self:custom.contests.tableName}
+    TICKETS_TABLE: ${self:custom.tickets.tableName}
+
+functions:
+  api:
+    handler: src/app.handler
+    events:
+      - httpApi: '*'
+
+resources:
+  - ${file(resources/dynamodb.yml)}
